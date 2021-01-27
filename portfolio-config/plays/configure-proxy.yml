@@ -1,0 +1,48 @@
+---
+- hosts: webserver #=> all hosts in the inventory.ini file
+  become: true #=> run the playbook as the become method
+  become_method: sudo #=> run the playbook as sudo
+  remote_user: "{{ create_user }}" #=> when sshing into remote machine, go in as root!
+
+  vars_files:
+    - ../vars/default.yml
+
+  tasks:
+
+  # - name: "create www directory"
+  #   file:
+  #     path: /var/www/{{ domain }}
+  #     state: directory
+  #     mode: '0775'
+  #     owner: "{{ create_user }}"
+
+  - name: delete default nginx site
+    file:
+      path: /etc/nginx/sites-enabled/default
+      state: absent
+    notify: restart nginx
+
+  - name: copy nginx site.conf
+    template:
+      src: ../templates/site.conf.j2
+      dest: /etc/nginx/sites-enabled/{{ domain }}
+      owner: root
+      group: root
+      mode: '0644'
+    notify: restart nginx
+
+  # - name: "sync website"
+  #   synchronize:
+  #     src: ../site/
+  #     dest: /var/www/{{ domain }}/html
+  #     archive: no
+  #     checksum: yes
+  #     recursive: yes
+  #     delete: yes
+  #   become: no
+
+  handlers:
+  - name: restart nginx
+    service:
+      name: nginx
+      state: restarted

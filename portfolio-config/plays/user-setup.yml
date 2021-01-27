@@ -1,0 +1,56 @@
+---
+- hosts: webserver #=> all hosts in the inventory.ini file
+  become: true #=> run the playbook as the become method
+  become_method: sudo #=> run the playbook as sudo
+  remote_user: root #=> when sshing into remote machine, go in as root!
+
+  vars_files:
+    - ../vars/default.yml
+  tasks:
+
+#Setup User and SSH  
+    - name: "Add new {{ user_name }}" 
+      user:
+        name: "{{ create_user }}"
+        state: present
+        create_home: true
+        shell: /bin/bash
+
+    - name: "Add {{ user_name }} to sudoers" 
+      copy:
+        dest: "/etc/sudoers.d/{{ create_user }}"
+        content: "{{ create_user }} ALL=(ALL) NOPASSWD: ALL"
+
+    - name: Deploy SSH Key
+      authorized_key:
+        user: "{{ create_user }}"
+        key: "{{ copy_local_key }}" 
+        state: present      
+
+
+    - name: Disable Password Authentication
+      lineinfile:
+        dest: /etc/ssh/sshd_config
+        regexp: '^PasswordAuthentication'
+        line: "PasswordAuthentication no"
+        state: present
+        backup: yes
+      notify:
+        - restart ssh
+
+  #Install packages
+    - name: Update apt
+      apt: update_cache=yes
+
+    - name: Install required packages
+      apt:
+        name: "{{ sys_packages }}"
+        state: latest
+
+  # Enable ufw
+    - { name: Enable ufw firewall for Ubuntu, ufw: state=enabled }
+
+  # Allow OpenSSH through the firewall and all access through port 80
+    - { name: Allow OpenSSH through the firewall, ufw: rule=allow name=OpenSSH }
+    - { name: Allow All Access to tcp port 80, ufw: rule=allow port=80 proto=tcp }  
+  

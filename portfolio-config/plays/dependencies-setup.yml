@@ -1,0 +1,24 @@
+---
+- hosts: webserver #=> all hosts in the inventory.ini file
+  become: true #=> run the playbook as the become method
+  become_method: sudo #=> run the playbook as sudo
+  remote_user: "{{ create_user }}" #=> when sshing into remote machine, go in as root!
+
+  vars_files:
+    - ../vars/default.yml
+
+  tasks:
+  # Install, Start and Enable Nginx through firewall
+   - { name: Install nginx, apt:     name=nginx state=present }
+   - { name: Start nginx,   service: name=nginx state=started }
+   - { name: Allow NginX through firewall, ufw: rule=allow name='Nginx Full' }
+
+  # Install node
+   - name: Install nodejs
+     apt: name=nodejs update_cache=yes
+
+  # Install npm
+   - { name: Install NPM, apt: name=npm state=present update_cache=yes }
+
+  # Install pm2
+   - { name: Install PM2, npm: name=pm2 global=yes }

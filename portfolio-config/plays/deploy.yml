@@ -1,0 +1,72 @@
+---
+- hosts: portfolio-server #=> all hosts in the inventory.ini file
+  # become: true #=> run the playbook as the become method
+  # become_method: sudo #=> run the playbook as sudo
+  remote_user: root #=> when sshing into remote machine, go in as root!
+
+  vars_files:
+    - ../vars/default.yml
+
+  tasks:
+
+  - name: Clone a private repository into app_path.
+    git:
+      repo: "{{ repository }}"
+      version: master
+      dest: "/var/www/{{ domain }}"
+      accept_hostkey: yes
+
+  - name: Change owner of app
+    file:
+      path: "/var/www/{{ domain }}"
+      owner: "{{ create_user }}"
+      mode: '1700'
+
+  # Install node
+  - name: Install nodejs
+    apt: name=nodejs update_cache=no
+
+  # Install pm2
+  - { name: Install PM2, npm: name=pm2 global=yes production=yes }
+
+  - name: Install npm dependencies & build the app
+    shell: npm i && npm run build
+    register: npm_finished
+    failed_when: '"ERR!" in npm_finished.stderr'
+    args:
+      chdir: "/var/www/{{ domain }}"
+
+  # - name: Delete old pm2 process
+  #   command: pm2 delete portfolio
+  #   ignore_errors: yes
+
+  # - name: Start pm2
+  #   command: "pm2 start /var/www/portfolio/dist/server.js --name portfolio"
+
+  - name: Start App
+    tags:
+      - launch
+    shell: pm2 start /var/www/portfolio/dist/server.js --name {{domain}} --update-env
+    args:
+      chdir: /var/www/portfolio
+    ignore_errors: yes
+    when: npm_finished.changed
+
+  - name: Restart App
+    tags:
+      - deploy
+    shell: pm2 restart {{domain}}
+
+  # - name: Start App
+  #   tags:
+  #     - launch
+  #   shell: pm2 start index.js --name {{domain}} --update-env
+  #   args:
+  #     chdir: /var/www
+  #   ignore_errors: yes
+  #   when: npm_finished.changed
+
+  # - name: Restart App
+  #   tags:
+  #     - deploy
+  #   shell: pm2 restart {{domain}}
